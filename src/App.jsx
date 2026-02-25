@@ -12,7 +12,7 @@ import AdminPanel from './pages/AdminPanel';
 
 function App() {
   return (
-    <Router>
+    <Router basename="/online-missing-product-rescheduling">
       <div className="min-h-screen">
         <Navbar />
         <main className="container mx-auto px-4 py-8">
