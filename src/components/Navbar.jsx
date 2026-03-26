@@ -35,14 +35,9 @@ const Navbar = () => {
 
             <div className="flex items-center gap-6">
                 {!user ? (
-                    <>
-                        <Link to="/login" className="text-slate-600 hover:text-primary-600 font-medium transition-colors">
-                            Login
-                        </Link>
-                        <Link to="/register" className="btn-primary">
-                            Register
-                        </Link>
-                    </>
+                    <Link to="/auth" className="btn-primary px-8 py-2.5 font-bold tracking-wide">
+                        Get Started
+                    </Link>
                 ) : (
                     <div className="flex items-center gap-4">
                         <Link

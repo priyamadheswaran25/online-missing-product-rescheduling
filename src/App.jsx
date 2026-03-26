@@ -1,12 +1,11 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Pages
 import Home from './pages/Home';
-import Login from './pages/Login';
-import Register from './pages/Register';
+import AuthPortal from './pages/AuthPortal';
 import Dashboard from './pages/Dashboard';
 import AdminPanel from './pages/AdminPanel';
 
@@ -14,12 +13,14 @@ function App() {
   return (
     <Router basename="/online-missing-product-rescheduling">
       <div className="min-h-screen">
+        <Toaster position="top-right" reverseOrder={false} />
         <Navbar />
         <main className="container mx-auto px-4 py-8">
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
+            <Route path="/auth" element={<AuthPortal />} />
+            <Route path="/login" element={<Navigate to="/auth" />} />
+            <Route path="/register" element={<Navigate to="/auth" />} />
 
             {/* Protected Routes */}
             <Route

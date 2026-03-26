@@ -5,6 +5,7 @@ import {
     Trash2, ShieldAlert, Search,
     Filter, Eye, Clock
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 /**
  * AdminPanel Page
@@ -18,33 +19,46 @@ const AdminPanel = () => {
 
     // Load all complaints on mount
     useEffect(() => {
-        const allComplaints = JSON.parse(localStorage.getItem('complaints')) || [];
-        setComplaints(allComplaints);
+        const fetchComplaints = async () => {
+            try {
+                const res = await fetch('/api/complaints');
+                const data = await res.json();
+                setComplaints(data);
+            } catch (err) {
+                console.error(err);
+            }
+        };
+        fetchComplaints();
     }, []);
 
-    const updateStatus = (id, newStatus) => {
-        const allComplaints = JSON.parse(localStorage.getItem('complaints')) || [];
-        const updated = allComplaints.map(c => {
-            if (c.id === id) {
-                return { ...c, status: newStatus };
+    const updateStatus = async (id, newStatus) => {
+        try {
+            const res = await fetch(`/api/complaints/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+            const updated = await res.json();
+            
+            setComplaints(complaints.map(c => c._id === id ? updated : c));
+            if (selectedComplaint?._id === id) {
+                setSelectedComplaint(updated);
             }
-            return c;
-        });
-
-        localStorage.setItem('complaints', JSON.stringify(updated));
-        setComplaints(updated);
-
-        if (selectedComplaint?.id === id) {
-            setSelectedComplaint({ ...selectedComplaint, status: newStatus });
+            toast.success(`Status updated to ${newStatus}`);
+        } catch (err) {
+            toast.error('Failed to update status');
         }
     };
 
-    const deleteComplaint = (id) => {
+    const deleteComplaint = async (id) => {
         if (window.confirm('Admin: Permanently delete this record?')) {
-            const allComplaints = JSON.parse(localStorage.getItem('complaints')) || [];
-            const updated = allComplaints.filter(c => c.id !== id);
-            localStorage.setItem('complaints', JSON.stringify(updated));
-            setComplaints(updated);
+            try {
+                await fetch(`/api/complaints/${id}`, { method: 'DELETE' });
+                setComplaints(complaints.filter(c => c._id !== id));
+                toast.success('Record deleted permanently');
+            } catch(err) {
+                toast.error('Server error deleting record');
+            }
         }
     };
 
@@ -77,7 +91,7 @@ const AdminPanel = () => {
                 <AdminStat cardTitle="Total Requests" count={complaints.length} icon={<Package className="text-blue-600" />} />
                 <AdminStat cardTitle="Pending" count={complaints.filter(c => c.status === 'Pending').length} icon={<Clock className="text-amber-500" />} />
                 <AdminStat cardTitle="Approved" count={complaints.filter(c => c.status === 'Approved').length} icon={<Check className="text-emerald-500" />} />
-                <AdminStat cardTitle="Rejected" count={complaints.filter(c => c.status === 'Rejected').length} icon={<X className="text-rose-500" />} />
+                <AdminStat cardTitle="Cancel" count={complaints.filter(c => c.status === 'Cancel').length} icon={<X className="text-rose-500" />} />
             </div>
 
             {/* Admin Search & Filter Bar */}
@@ -102,7 +116,7 @@ const AdminPanel = () => {
                         <option value="All">All Status</option>
                         <option value="Pending">Pending</option>
                         <option value="Approved">Approved</option>
-                        <option value="Rejected">Rejected</option>
+                        <option value="Cancel">Cancel</option>
                     </select>
                 </div>
             </div>
@@ -123,7 +137,7 @@ const AdminPanel = () => {
                         <tbody className="divide-y divide-slate-50">
                             {filteredComplaints.length > 0 ? (
                                 filteredComplaints.map((c) => (
-                                    <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                                    <tr key={c._id} className="hover:bg-slate-50 transition-colors">
                                         <td className="px-6 py-5">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold">
@@ -147,7 +161,7 @@ const AdminPanel = () => {
                                         </td>
                                         <td className="px-6 py-5">
                                             <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${c.status === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
-                                                    c.status === 'Rejected' ? 'bg-rose-50 text-rose-600 border-rose-200' :
+                                                    c.status === 'Cancel' ? 'bg-rose-50 text-rose-600 border-rose-200' :
                                                         'bg-amber-50 text-amber-600 border-amber-200'
                                                 }`}>
                                                 {c.status}
@@ -158,23 +172,23 @@ const AdminPanel = () => {
                                                 {c.status === 'Pending' && (
                                                     <>
                                                         <button
-                                                            onClick={() => updateStatus(c.id, 'Approved')}
+                                                            onClick={() => updateStatus(c._id, 'Approved')}
                                                             className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
                                                             title="Approve"
                                                         >
                                                             <Check className="w-4 h-4" />
                                                         </button>
                                                         <button
-                                                            onClick={() => updateStatus(c.id, 'Rejected')}
+                                                            onClick={() => updateStatus(c._id, 'Cancel')}
                                                             className="p-2 bg-rose-100 text-rose-600 rounded-lg hover:bg-rose-600 hover:text-white transition-all shadow-sm"
-                                                            title="Reject"
+                                                            title="Cancel"
                                                         >
                                                             <X className="w-4 h-4" />
                                                         </button>
                                                     </>
                                                 )}
                                                 <button
-                                                    onClick={() => deleteComplaint(c.id)}
+                                                    onClick={() => deleteComplaint(c._id)}
                                                     className="p-2 bg-slate-100 text-slate-400 rounded-lg hover:bg-slate-900 hover:text-white transition-all shadow-sm"
                                                     title="Delete Permanent"
                                                 >

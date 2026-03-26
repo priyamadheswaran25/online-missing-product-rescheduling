@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     PlusCircle, Search, Filter, Trash2, CheckCircle,
     Clock, AlertCircle, Package, Calendar, MapPin,
-    ChevronDown, X
+    ChevronDown, X, Edit
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 /**
  * Dashboard Page
@@ -16,7 +17,7 @@ const Dashboard = () => {
     const [complaints, setComplaints] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
-    const [message, setMessage] = useState(null);
+    const [isEditing, setIsEditing] = useState(false);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -25,16 +26,24 @@ const Dashboard = () => {
         deliveryDate: '',
         issueType: 'Not Delivered',
         rescheduleDate: '',
-        address: ''
+        address: '',
+        status: 'Pending'
     });
 
     // 💡 useEffect: This hook runs a piece of code automatically.
     // We use it here to pull data from localStorage as soon as the Dashboard loads.
     useEffect(() => {
-        const allComplaints = JSON.parse(localStorage.getItem('complaints')) || [];
-        // Only show user's own complaints (Filtering data)
-        const userComplaints = allComplaints.filter(c => c.userId === user.id);
-        setComplaints(userComplaints);
+        const fetchComplaints = async () => {
+            try {
+                const res = await fetch('/api/complaints');
+                const data = await res.json();
+                const userComplaints = data.filter(c => c.userId === user.id);
+                setComplaints(userComplaints);
+            } catch (err) {
+                console.error(err);
+            }
+        };
+        fetchComplaints();
     }, [user.id]); // The [user.id] means "re-run this if the user's ID changes"
 
     const handleSubmit = (e) => {
@@ -45,44 +54,68 @@ const Dashboard = () => {
             return;
         }
 
-        const newComplaint = {
-            ...formData,
-            id: Date.now(),
-            userId: user.id,
-            userName: user.name,
-            status: 'Pending',
-            createdAt: new Date().toISOString()
+        const processSubmission = async () => {
+            try {
+                if (isEditing) {
+                    const res = await fetch(`/api/complaints/${formData._id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ...formData, userId: user.id, userName: user.name })
+                    });
+                    const updatedComplaint = await res.json();
+                    setComplaints(complaints.map(c => c._id === updatedComplaint._id ? updatedComplaint : c));
+                    toast.success('Report updated successfully!');
+                } else {
+                    const newComplaintData = {
+                        ...formData,
+                        userId: user.id,
+                        userName: user.name,
+                    };
+                    const res = await fetch('/api/complaints', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(newComplaintData)
+                    });
+                    const newComplaint = await res.json();
+                    setComplaints([newComplaint, ...complaints]);
+                    toast.success('Complaint submitted successfully!');
+                }
+            } catch (err) {
+                toast.error('Server error!');
+            }
         };
+        processSubmission();
 
-        // 💡 localStorage usage for saving data
-        const allComplaints = JSON.parse(localStorage.getItem('complaints')) || [];
-        const updatedAll = [newComplaint, ...allComplaints];
-        localStorage.setItem('complaints', JSON.stringify(updatedAll));
-
-        setComplaints([newComplaint, ...complaints]);
         setFormData({
             orderId: '',
             productName: '',
             deliveryDate: '',
             issueType: 'Not Delivered',
             rescheduleDate: '',
-            address: ''
+            address: '',
+            status: 'Pending'
         });
+        setIsEditing(false);
         setShowForm(false);
 
-        setMessage({ type: 'success', text: 'Complaint submitted successfully!' });
         setTimeout(() => setMessage(null), 3000);
     };
 
-    const handleDelete = (id) => {
-        if (window.confirm('Are you sure you want to delete this report?')) {
-            const allComplaints = JSON.parse(localStorage.getItem('complaints')) || [];
-            const updatedAll = allComplaints.filter(c => c.id !== id);
-            localStorage.setItem('complaints', JSON.stringify(updatedAll));
+    const handleEdit = (complaint) => {
+        setFormData(complaint);
+        setIsEditing(true);
+        setShowForm(true);
+    };
 
-            setComplaints(complaints.filter(c => c.id !== id));
-            setMessage({ type: 'error', text: 'Report deleted' });
-            setTimeout(() => setMessage(null), 3000);
+    const handleDelete = async (id) => {
+        if (window.confirm('Are you sure you want to delete this report?')) {
+            try {
+                await fetch(`/api/complaints/${id}`, { method: 'DELETE' });
+                setComplaints(complaints.filter(c => c._id !== id));
+                toast.success('Report deleted successfully');
+            } catch (err) {
+                toast.error('Server error!');
+            }
         }
     };
 
@@ -127,27 +160,11 @@ const Dashboard = () => {
                 />
                 <StatCard
                     icon={<X className="text-rose-600" />}
-                    label="Rejected"
-                    count={complaints.filter(c => c.status === 'Rejected').length}
+                    label="Cancel"
+                    count={complaints.filter(c => c.status === 'Cancel').length}
                     color="bg-rose-50"
                 />
             </div>
-
-            {/* Success/Error Alerts */}
-            <AnimatePresence>
-                {message && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        className={`p-4 rounded-xl flex items-center gap-3 font-medium shadow-sm ${message.type === 'success' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                            }`}
-                    >
-                        {message.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
-                        {message.text}
-                    </motion.div>
-                )}
-            </AnimatePresence>
 
             {/* Search & Filter Bar */}
             <div className="glass-panel p-4 rounded-2xl flex flex-col md:flex-row gap-4 items-center">
@@ -171,7 +188,7 @@ const Dashboard = () => {
                         <option value="All">All Status</option>
                         <option value="Pending">Pending</option>
                         <option value="Approved">Approved</option>
-                        <option value="Rejected">Rejected</option>
+                        <option value="Cancel">Cancel</option>
                     </select>
                 </div>
             </div>
@@ -192,7 +209,7 @@ const Dashboard = () => {
                         <tbody className="divide-y divide-slate-100 italic md:not-italic">
                             {filteredComplaints.length > 0 ? (
                                 filteredComplaints.map((c) => (
-                                    <tr key={c.id} className="hover:bg-blue-50/30 transition-colors group">
+                                    <tr key={c._id} className="hover:bg-blue-50/30 transition-colors group">
                                         <td className="px-6 py-4">
                                             <div className="font-bold text-slate-800">{c.productName}</div>
                                             <div className="text-xs text-slate-400 font-mono">ID: {c.orderId}</div>
@@ -207,19 +224,27 @@ const Dashboard = () => {
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${c.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' :
-                                                c.status === 'Rejected' ? 'bg-rose-100 text-rose-700' :
+                                                c.status === 'Cancel' ? 'bg-rose-100 text-rose-700' :
                                                     'bg-amber-100 text-amber-700'
                                                 }`}>
                                                 {c.status}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <button
-                                                onClick={() => handleDelete(c.id)}
-                                                className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
+                                            <div className="flex justify-start items-center gap-2">
+                                                <button
+                                                    onClick={() => handleEdit(c)}
+                                                    className="p-2 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                                                >
+                                                    <Edit className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(c._id)}
+                                                    className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
@@ -256,9 +281,16 @@ const Dashboard = () => {
                             className="relative bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
                         >
                             <div className="p-6 border-b flex justify-between items-center bg-slate-50">
-                                <h2 className="text-2xl font-bold text-slate-800">Report Missing Product</h2>
+                                <h2 className="text-2xl font-bold text-slate-800">{isEditing ? 'Edit Missing Product Report' : 'Report Missing Product'}</h2>
                                 <button
-                                    onClick={() => setShowForm(false)}
+                                    onClick={() => {
+                                        setShowForm(false);
+                                        setIsEditing(false);
+                                        setFormData({
+                                            orderId: '', productName: '', deliveryDate: '',
+                                            issueType: 'Not Delivered', rescheduleDate: '', address: '', status: 'Pending'
+                                        });
+                                    }}
                                     className="p-2 hover:bg-slate-200 rounded-full transition-colors"
                                 >
                                     <X className="w-6 h-6" />
@@ -320,6 +352,19 @@ const Dashboard = () => {
                                                 <option>Missing Item</option>
                                             </select>
                                         </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-2">Status</label>
+                                        <select
+                                            className="input-field"
+                                            value={formData.status || 'Pending'}
+                                            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                        >
+                                            <option value="Pending">Pending</option>
+                                            <option value="Approved">Approved</option>
+                                            <option value="Cancel">Cancel</option>
+                                        </select>
                                     </div>
 
                                     <div>
