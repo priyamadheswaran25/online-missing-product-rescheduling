@@ -1,78 +1,123 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { ShieldCheck, Truck, Clock, BarChart3 } from 'lucide-react';
+import { 
+    Typography, 
+    Button, 
+    Card, 
+    Row, 
+    Col, 
+    Space,
+    ConfigProvider
+} from 'antd';
+import { 
+    TruckOutlined, 
+    ClockCircleOutlined, 
+    SecurityScanOutlined, 
+    DashboardOutlined,
+    ArrowRightOutlined
+} from '@ant-design/icons';
 
-/**
- * Home Page
- * Hero section and feature highlights.
- */
+const { Title, Paragraph, Text } = Typography;
+
 const Home = () => {
     return (
-        <div className="flex flex-col items-center gap-20 py-12">
-            {/* Hero Section */}
-            <section className="text-center max-w-4xl px-4 animate-fade-in">
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6 }}
-                >
-                    <h1 className="text-5xl md:text-6xl font-extrabold text-slate-900 mb-6 leading-tight">
-                        Online Missing Product <span className="gradient-text">Rescheduling</span> System
-                    </h1>
-                    <p className="text-xl text-slate-600 mb-10 max-w-2xl mx-auto">
-                        Report, Track and Reschedule Your Missing Deliveries Easily.
-                        ReScheduleX ensures your logistics problems are solved with a few clicks.
-                    </p>
-                    <div className="flex flex-wrap justify-center gap-4">
-                        <Link to="/register" className="btn-primary text-lg px-8 py-3">
-                            Get Started Now
-                        </Link>
-                        <Link to="/login" className="btn-secondary text-lg px-8 py-3">
-                            Login to Account
-                        </Link>
+        <ConfigProvider
+            theme={{
+                token: {
+                    colorPrimary: '#2563eb',
+                    borderRadius: 16,
+                },
+            }}
+        >
+            <div className="flex flex-col items-center gap-24 py-16 px-4 bg-slate-950 min-h-screen text-white">
+                {/* Hero Section */}
+                <section className="text-center max-w-4xl pt-20">
+                    <div>
+                        <Title level={1} style={{ color: 'white', fontSize: '64px', fontWeight: 900, marginBottom: '32px' }}>
+                            Online Missing Product <br/>
+                            <span className="text-blue-500">
+                                Rescheduling
+                            </span> System
+                        </Title>
+                        <Paragraph style={{ color: '#94a3b8', fontSize: '20px', marginBottom: '48px' }}>
+                            Report, track, and automate your missing deliveries. 
+                            <Text strong style={{ color: 'white' }}> ReScheduleX</Text> delivers a premium resolution experience.
+                        </Paragraph>
+                        
+                        <Space size="middle" className="flex-wrap justify-center">
+                            <Link to="/auth">
+                                <Button 
+                                    type="primary" 
+                                    size="large" 
+                                    style={{ height: '56px', padding: '0 40px', fontSize: '18px', fontWeight: 700, borderRadius: '12px' }}
+                                >
+                                    Get Started <ArrowRightOutlined />
+                                </Button>
+                            </Link>
+                            <Link to="/auth">
+                                <Button 
+                                    size="large" 
+                                    ghost
+                                    style={{ height: '56px', padding: '0 40px', fontSize: '18px', fontWeight: 700, borderRadius: '12px' }}
+                                >
+                                    Log In
+                                </Button>
+                            </Link>
+                        </Space>
                     </div>
-                </motion.div>
-            </section>
+                </section>
 
-            {/* Features Grid */}
-            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 w-full max-w-6xl px-4">
-                <FeatureCard
-                    icon={<Truck className="w-8 h-8 text-blue-600" />}
-                    title="Easy Reporting"
-                    description="Log your missing items instantly with our intuitive dashboard."
-                />
-                <FeatureCard
-                    icon={<Clock className="w-8 h-8 text-blue-600" />}
-                    title="Smart Rescheduling"
-                    description="Pick a new delivery date that works best for your schedule."
-                />
-                <FeatureCard
-                    icon={<ShieldCheck className="w-8 h-8 text-blue-600" />}
-                    title="Secure Tracking"
-                    description="Monitor your requests and get updates on approval status."
-                />
-                <FeatureCard
-                    icon={<BarChart3 className="w-8 h-8 text-blue-600" />}
-                    title="Admin Oversight"
-                    description="Efficient management panel for processing all user claims."
-                />
-            </section>
-        </div>
+                {/* Features Grid */}
+                <section className="w-full max-w-6xl">
+                    <Row gutter={[32, 32]}>
+                        <Col xs={24} md={12} lg={6}>
+                            <FeatureCard
+                                icon={<TruckOutlined style={{ fontSize: '32px', color: '#3b82f6' }} />}
+                                title="Instant Reporting"
+                                description="Log missing items in seconds through our streamlined secure portal."
+                            />
+                        </Col>
+                        <Col xs={24} md={12} lg={6}>
+                            <FeatureCard
+                                icon={<ClockCircleOutlined style={{ fontSize: '32px', color: '#3b82f6' }} />}
+                                title="Smart Recovery"
+                                description="Automated reschedule logic finds the fastest delivery windows."
+                            />
+                        </Col>
+                        <Col xs={24} md={12} lg={6}>
+                            <FeatureCard
+                                icon={<SecurityScanOutlined style={{ fontSize: '32px', color: '#3b82f6' }} />}
+                                title="Secure Track"
+                                description="Real-time surveillance on your claims with end-to-end encryption."
+                            />
+                        </Col>
+                        <Col xs={24} md={12} lg={6}>
+                            <FeatureCard
+                                icon={<DashboardOutlined style={{ fontSize: '32px', color: '#3b82f6' }} />}
+                                title="Admin Control"
+                                description="Advanced terminal for processors to manage global logistics."
+                            />
+                        </Col>
+                    </Row>
+                </section>
+            </div>
+        </ConfigProvider>
     );
 };
 
 const FeatureCard = ({ icon, title, description }) => (
-    <motion.div
-        whileHover={{ y: -10 }}
-        className="glass-panel p-8 rounded-2xl flex flex-col gap-4 text-center md:text-left transition-all hover:shadow-xl"
+    <Card 
+        style={{ height: '100%', background: 'rgba(30, 41, 59, 0.5)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '24px' }}
+        bodyStyle={{ padding: '40px' }}
     >
-        <div className="bg-blue-50 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto md:mx-0">
+        <div style={{ background: 'rgba(59, 130, 246, 0.1)', width: '64px', height: '64px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px' }}>
             {icon}
         </div>
-        <h3 className="text-xl font-bold text-slate-800">{title}</h3>
-        <p className="text-slate-600 leading-relaxed">{description}</p>
-    </motion.div>
+        <Title level={4} style={{ color: 'white', fontWeight: 800, marginBottom: '12px' }}>{title}</Title>
+        <Paragraph style={{ color: '#94a3b8', margin: 0 }}>
+            {description}
+        </Paragraph>
+    </Card>
 );
 
 export default Home;

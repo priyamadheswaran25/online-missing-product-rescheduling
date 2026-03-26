@@ -1,3 +1,4 @@
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Navbar from './components/Navbar';
@@ -11,11 +12,11 @@ import AdminPanel from './pages/AdminPanel';
 
 function App() {
   return (
-    <Router basename="/online-missing-product-rescheduling">
+    <Router basename="/">
       <div className="min-h-screen">
         <Toaster position="top-right" reverseOrder={false} />
         <Navbar />
-        <main className="container mx-auto px-4 py-8">
+        <main>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/auth" element={<AuthPortal />} />

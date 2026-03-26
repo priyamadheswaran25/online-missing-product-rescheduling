@@ -1,258 +1,219 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { User, Mail, Phone, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, Zap } from 'lucide-react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { 
+    Tabs, 
+    Form, 
+    Input, 
+    Button, 
+    Card, 
+    Typography, 
+    Space,
+    ConfigProvider,
+    theme
+} from 'antd';
+import { 
+    UserOutlined, 
+    MailOutlined, 
+    PhoneOutlined, 
+    LockOutlined, 
+    ArrowRightOutlined,
+    SafetyCertificateOutlined,
+    ThunderboltFilled
+} from '@ant-design/icons';
 import toast from 'react-hot-toast';
+
+const { Title, Text } = Typography;
 
 const AuthPortal = () => {
     const navigate = useNavigate();
-    const { state } = useLocation();
-    const [isLogin, setIsLogin] = useState(true);
-    const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [activeTab, setActiveTab] = useState('login');
 
-    const [formData, setFormData] = useState({
-        name: '',
-        email: '',
-        phone: '',
-        password: ''
-    });
-
-    // Real-time Validation States
-    const [validations, setValidations] = useState({
-        name: false,
-        email: false,
-        password: {
-            length: false,
-            letter: false,
-            number: false,
-            special: false
-        }
-    });
-
-    useEffect(() => {
-        setValidations({
-            name: formData.name.length >= 3 && /[A-Za-z]/.test(formData.name) && /\d/.test(formData.name),
-            email: /^[^\s@]+@gmail\.com$/.test(formData.email),
-            password: {
-                length: formData.password.length >= 6,
-                letter: /[a-zA-Z]/.test(formData.password),
-                number: /\d/.test(formData.password),
-                special: /[@$!%*?&]/.test(formData.password)
-            }
-        });
-    }, [formData]);
-
-    const handleAuth = async (e) => {
-        e.preventDefault();
-        setError('');
-        setSuccess('');
-
-        if (!isLogin) {
-            if (!validations.name || !validations.email || !validations.password.length || !validations.password.letter || !validations.password.number || !validations.password.special) {
-                toast.error('Please satisfy all real-time requirements.');
-                return;
-            }
-        }
-
+    const onFinish = async (values) => {
         setIsLoading(true);
-
         try {
+            const isLogin = activeTab === 'login';
             const endpoint = isLogin ? '/api/login' : '/api/register';
-            const role = formData.email === 'admin@reschedulex.com' ? 'admin' : 'user';
+            const role = values.email === 'admin@reschedulex.com' ? 'admin' : 'user';
             
+            const payload = isLogin 
+                ? { email: values.email, password: values.password }
+                : { ...values, role };
+
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(isLogin ? { email: formData.email, password: formData.password } : { ...formData, role })
+                body: JSON.stringify(payload)
             });
 
             const data = await response.json();
 
             if (!response.ok) {
-                toast.error(data.error || 'Authentication failed');
+                toast.error(data.error || 'System access denied. Please verify credentials.');
                 setIsLoading(false);
                 return;
             }
 
             if (isLogin) {
                 localStorage.setItem('currentUser', JSON.stringify(data.user));
-                toast.success('Welcome back!');
+                toast.success('Access Granted. Routing to dashboard...');
                 navigate(data.user.role === 'admin' ? '/admin' : '/dashboard');
             } else {
-                toast.success('Registration successful! Please sign in.');
-                setIsLogin(true);
+                toast.success('Account established! Please sign in with your credentials.');
+                setActiveTab('login');
                 setIsLoading(false);
             }
-        } catch (err) {
-            toast.error('System connection error. Verify backend status.');
+        } catch {
+            toast.error('Logistics server connection error. Retrying in background...');
             setIsLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-slate-950">
-            {/* Background Decorations */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-primary-600/20 blur-[120px] rounded-full animate-pulse" />
-                <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-indigo-600/20 blur-[120px] rounded-full animate-pulse" style={{ animationDelay: '1s' }} />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(circle_at_center,transparent_0%,rgba(2,6,23,0.8)_100%)]" />
-            </div>
+        <ConfigProvider
+            theme={{
+                algorithm: theme.darkAlgorithm,
+                token: {
+                    colorPrimary: '#2563eb',
+                    borderRadius: 16,
+                    colorBgContainer: 'rgba(15, 23, 42, 0.65)',
+                    colorBorder: 'rgba(255, 255, 255, 0.1)',
+                },
+                components: {
+                    Input: {
+                        controlHeight: 48,
+                        borderRadius: 12,
+                        colorBgContainer: 'rgba(30, 41, 59, 0.5)',
+                    },
+                    Button: {
+                        controlHeight: 48,
+                        borderRadius: 12,
+                        fontWeight: 700,
+                    },
+                    Tabs: {
+                        titleFontSize: 16,
+                        horizontalItemPadding: '12px 0',
+                    }
+                }
+            }}
+        >
+            <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-[#020617] py-12">
+                {/* Animated Background Mesh */}
+                <div className="absolute inset-0 z-0 overflow-hidden">
+                    <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-blue-600/10 blur-[130px] animate-[pulse_10s_infinite]" />
+                    <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-600/15 blur-[130px] animate-[pulse_12s_infinite_2s]" />
+                </div>
 
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="relative z-10 w-full max-w-[440px] px-6"
-            >
-                <div className="glass-panel backdrop-blur-2xl border border-white/10 p-8 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] bg-slate-900/40">
-                    <div className="text-center mb-8">
-                        <motion.div 
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ type: 'spring', damping: 12 }}
-                            className="inline-flex p-3 rounded-2xl bg-primary-500/10 text-primary-400 mb-4"
-                        >
-                            <Zap className="w-8 h-8 fill-current" />
-                        </motion.div>
-                        <h2 className="text-3xl font-black text-white tracking-tight">
-                            {isLogin ? 'Welcome Back' : 'Create Access'}
-                        </h2>
-                        <p className="text-slate-400 mt-2 text-sm">
-                            {isLogin ? 'Secure access to your rescheduling hub' : 'Join the elite product logistics platform'}
-                        </p>
-                    </div>
-
-                    <div className="flex p-1 bg-slate-800/50 rounded-2xl mb-8">
-                        <button
-                            onClick={() => { setIsLogin(true); }}
-                            className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${isLogin ? 'bg-primary-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
-                        >
-                            Sign In
-                        </button>
-                        <button
-                            onClick={() => { setIsLogin(false); }}
-                            className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${!isLogin ? 'bg-primary-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
-                        >
-                            Register
-                        </button>
-                    </div>
-
-                    <AnimatePresence mode="wait">
-                        <motion.form
-                            key={isLogin ? 'login' : 'register'}
-                            initial={{ opacity: 0, x: isLogin ? -20 : 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: isLogin ? 20 : -20 }}
-                            onSubmit={handleAuth}
-                            className="space-y-4"
-                        >
-                            {!isLogin && (
-                                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="space-y-4 overflow-hidden">
-                                    <div className="relative group">
-                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                            <User className={`w-5 h-5 transition-colors ${validations.name ? 'text-primary-400' : 'text-slate-500 group-focus-within:text-primary-500'}`} />
-                                        </div>
-                                        <input
-                                            type="text"
-                                            placeholder="Full Name (John123)"
-                                            required
-                                            className="w-full bg-slate-800/30 border border-slate-700/50 text-white pl-11 pr-4 py-3.5 rounded-2xl outline-none focus:border-primary-500/50 focus:ring-4 focus:ring-primary-500/10 transition-all placeholder:text-slate-600"
-                                            value={formData.name}
-                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="relative group">
-                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                            <Phone className="w-5 h-5 text-slate-500 group-focus-within:text-primary-500" />
-                                        </div>
-                                        <input
-                                            type="tel"
-                                            placeholder="Mobile Number"
-                                            className="w-full bg-slate-800/30 border border-slate-700/50 text-white pl-11 pr-4 py-3.5 rounded-2xl outline-none focus:border-primary-500/50 focus:ring-4 focus:ring-primary-500/10 transition-all placeholder:text-slate-600"
-                                            value={formData.phone}
-                                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                        />
-                                    </div>
-                                </motion.div>
-                            )}
-
-                            <div className="relative group">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                    <Mail className={`w-5 h-5 transition-colors ${validations.email ? 'text-primary-400' : 'text-slate-500 group-focus-within:text-primary-500'}`} />
+                <div className="relative z-10 w-full max-w-[480px] px-6">
+                    <Card 
+                        className="glass-panel border-white/10 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] overflow-hidden"
+                        styles={{ body: { padding: '40px' } }}
+                    >
+                        {/* Custom Header */}
+                        <div className="text-center mb-10">
+                            <div className="inline-flex relative mb-6">
+                                <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full scale-150 animate-pulse" />
+                                <div className="relative p-4 rounded-2xl bg-linear-to-br from-blue-600/20 to-indigo-600/20 text-blue-400 border border-blue-500/20">
+                                    <ThunderboltFilled className="text-3xl" />
                                 </div>
-                                <input
-                                    type="email"
-                                    placeholder="Gmail Address"
-                                    required
-                                    className="w-full bg-slate-800/30 border border-slate-700/50 text-white pl-11 pr-4 py-3.5 rounded-2xl outline-none focus:border-primary-500/50 focus:ring-4 focus:ring-primary-500/10 transition-all placeholder:text-slate-600"
-                                    value={formData.email}
-                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                />
                             </div>
+                            <Title level={2} style={{ margin: 0, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff' }}>
+                                {activeTab === 'login' ? 'ReScheduleX Hub' : 'Join Logistics'}
+                            </Title>
+                            <Text className="text-slate-400 font-medium block mt-2">
+                                {activeTab === 'login' ? 'Secure authentication for product rescheduling' : 'Establish your enterprise logistics account'}
+                            </Text>
+                        </div>
 
-                            <div className="relative group">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                    <Lock className="w-5 h-5 text-slate-500 group-focus-within:text-primary-500" />
-                                </div>
-                                <input
-                                    type={showPassword ? 'text' : 'password'}
-                                    placeholder="Secret Key"
-                                    required
-                                    className="w-full bg-slate-800/30 border border-slate-700/50 text-white pl-11 pr-12 py-3.5 rounded-2xl outline-none focus:border-primary-500/50 focus:ring-4 focus:ring-primary-500/10 transition-all placeholder:text-slate-600"
-                                    value={formData.password}
-                                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                />
-                                <button
-                                    type="button"
-                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-500 hover:text-white transition-colors"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                >
-                                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                                </button>
-                            </div>
+                        <Tabs 
+                            activeKey={activeTab} 
+                            onChange={setActiveTab} 
+                            centered
+                            className="custom-tabs mb-6"
+                            items={[
+                                { key: 'login', label: 'SIGN IN' },
+                                { key: 'register', label: 'REGISTER' },
+                            ]}
+                        />
 
-                            {!isLogin && (
-                                <div className="grid grid-cols-2 gap-2 text-[10px] uppercase font-bold tracking-wider pt-2">
-                                    <Requirement met={validations.password.length} text="6+ Characters" />
-                                    <Requirement met={validations.password.letter} text="1+ Letter" />
-                                    <Requirement met={validations.password.number} text="1+ Number" />
-                                    <Requirement met={validations.password.special} text="Special Char" />
+                        <Form
+                            layout="vertical"
+                            onFinish={onFinish}
+                            autoComplete="off"
+                            requiredMark={false}
+                        >
+                            {activeTab === 'register' && (
+                                <div className="overflow-hidden">
+                                    <Form.Item
+                                        name="name"
+                                        rules={[{ required: true, message: 'Please input your full identity' }, { min: 3, message: 'Full identity too short' }]}
+                                    >
+                                        <Input 
+                                            prefix={<UserOutlined className="text-slate-400 mr-2" />} 
+                                            placeholder="Full Legal Name" 
+                                        />
+                                    </Form.Item>
+
+                                    <Form.Item name="phone">
+                                        <Input 
+                                            prefix={<PhoneOutlined className="text-slate-400 mr-2" />} 
+                                            placeholder="Secure Mobile ID" 
+                                        />
+                                    </Form.Item>
                                 </div>
                             )}
 
-                            <button
-                                type="submit"
-                                disabled={isLoading}
-                                className="w-full bg-gradient-to-r from-primary-600 to-indigo-600 hover:from-primary-500 hover:to-indigo-500 text-white font-bold py-4 rounded-2xl shadow-[0_10px_20px_rgba(37,99,235,0.3)] transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
+                            <Form.Item
+                                name="email"
+                                rules={[
+                                    { required: true, message: 'Identity email required' },
+                                    { type: 'email', message: 'Invalid logistics email format' }
+                                ]}
                             >
-                                {isLoading ? (
-                                    <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" />
-                                ) : (
-                                    <>
-                                        {isLogin ? 'Enter Hub' : 'Create Account'}
-                                        <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                                    </>
-                                )}
-                            </button>
-                        </motion.form>
-                    </AnimatePresence>
-                </div>
+                                <Input 
+                                    prefix={<MailOutlined className="text-slate-400 mr-2" />} 
+                                    placeholder="Logistics Email (example@company.com)" 
+                                />
+                            </Form.Item>
 
-                <div className="mt-8 text-center">
-                    <p className="text-slate-500 text-sm">
-                        Enterprise Grade Security via MongoDB Atlas
-                    </p>
-                </div>
-            </motion.div>
+                            <Form.Item
+                                name="password"
+                                rules={[{ required: true, message: 'Security key missing' }, { min: 6, message: 'Security key below 6 bits' }]}
+                            >
+                                <Input.Password 
+                                    prefix={<LockOutlined className="text-slate-400 mr-2" />} 
+                                    placeholder="Nexus Authentication Key" 
+                                />
+                            </Form.Item>
+
+                            <Form.Item className="mt-8 mb-0">
+                                <Button 
+                                    type="primary" 
+                                    htmlType="submit" 
+                                    block 
+                                    loading={isLoading}
+                                    className="bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-900/40 border-none group"
+                                >
+                                    <span className="flex items-center justify-center gap-2">
+                                        {activeTab === 'login' ? 'INITIATE ACCESS' : 'ESTABLISH CONNECT'}
+                                        <ArrowRightOutlined className="group-hover:translate-x-1 transition-transform" />
+                                    </span>
+                                </Button>
+                            </Form.Item>
+                        </Form>
+                    </Card>
+
+                    <Space className="w-full justify-center mt-10 text-slate-500">
+                        <SafetyCertificateOutlined className="text-emerald-500" />
+                        <Text className="text-slate-500 text-xs tracking-widest uppercase">
+                            Encrypted Nexus Shield Active
+                    </Text>
+                </Space>
+            </div>
         </div>
+            
+        </ConfigProvider>
     );
 };
-
-const Requirement = ({ met, text }) => (
-    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all ${met ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-slate-800/30 border-slate-700/50 text-slate-500'}`}>
-        <div className={`w-1 h-1 rounded-full ${met ? 'bg-emerald-400' : 'bg-slate-600'}`} />
-        {text}
-    </div>
-);
 
 export default AuthPortal;

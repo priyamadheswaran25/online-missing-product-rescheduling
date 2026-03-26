@@ -1,125 +1,149 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useCallback } from 'react';
+// eslint-disable-next-line no-unused-vars
+import { motion } from 'framer-motion';
 import {
-    PlusCircle, Search, Filter, Trash2, CheckCircle,
-    Clock, AlertCircle, Package, Calendar, MapPin,
-    ChevronDown, X, Edit
-} from 'lucide-react';
+    Table,
+    Modal,
+    Form,
+    Input,
+    Button,
+    Card,
+    DatePicker,
+    Select,
+    Tag,
+    Space,
+    Typography,
+    Row,
+    Col,
+    Statistic,
+    Empty,
+    ConfigProvider,
+    theme,
+    Tooltip
+} from 'antd';
+import {
+    PlusOutlined,
+    SearchOutlined,
+    FilterOutlined,
+    DeleteOutlined,
+    EditOutlined,
+    CheckCircleOutlined,
+    ClockCircleOutlined,
+    CloseCircleOutlined,
+    EnvironmentOutlined,
+    BarcodeOutlined,
+    CalendarOutlined,
+    InfoCircleOutlined,
+    ThunderboltFilled
+} from '@ant-design/icons';
+import dayjs from 'dayjs';
 import toast from 'react-hot-toast';
 
-/**
- * Dashboard Page
- * Main user interface for reporting and tracking missing products.
- */
+const { Title, Text, Paragraph } = Typography;
+const { TextArea } = Input;
+
 const Dashboard = () => {
-    const [user, setUser] = useState(JSON.parse(localStorage.getItem('currentUser')));
-    const [showForm, setShowForm] = useState(false);
+    const [user] = useState(() => JSON.parse(localStorage.getItem('currentUser')));
     const [complaints, setComplaints] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingComplaint, setEditingComplaint] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
-    const [isEditing, setIsEditing] = useState(false);
+    const [form] = Form.useForm();
 
-    // Form State
-    const [formData, setFormData] = useState({
-        orderId: '',
-        productName: '',
-        deliveryDate: '',
-        issueType: 'Not Delivered',
-        rescheduleDate: '',
-        address: '',
-        status: 'Pending'
-    });
-
-    // 💡 useEffect: This hook runs a piece of code automatically.
-    // We use it here to pull data from localStorage as soon as the Dashboard loads.
-    useEffect(() => {
-        const fetchComplaints = async () => {
-            try {
-                const res = await fetch('/api/complaints');
-                const data = await res.json();
-                const userComplaints = data.filter(c => c.userId === user.id);
-                setComplaints(userComplaints);
-            } catch (err) {
-                console.error(err);
-            }
-        };
-        fetchComplaints();
-    }, [user.id]); // The [user.id] means "re-run this if the user's ID changes"
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        // 💡 Form Validation check
-        if (!formData.orderId || !formData.productName || !formData.deliveryDate || !formData.rescheduleDate || !formData.address) {
-            alert('Please fill all fields');
-            return;
+    const fetchComplaints = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const res = await fetch('/api/complaints');
+            const data = await res.json();
+            const userComplaints = data.filter(c => c.userId === user.id);
+            setComplaints(userComplaints);
+        } catch {
+            toast.error('Failed to sync with logistics database');
+        } finally {
+            setIsLoading(false);
         }
+    }, [user.id]);
 
-        const processSubmission = async () => {
-            try {
-                if (isEditing) {
-                    const res = await fetch(`/api/complaints/${formData._id}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ...formData, userId: user.id, userName: user.name })
-                    });
-                    const updatedComplaint = await res.json();
-                    setComplaints(complaints.map(c => c._id === updatedComplaint._id ? updatedComplaint : c));
-                    toast.success('Report updated successfully!');
-                } else {
-                    const newComplaintData = {
-                        ...formData,
-                        userId: user.id,
-                        userName: user.name,
-                    };
-                    const res = await fetch('/api/complaints', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(newComplaintData)
-                    });
-                    const newComplaint = await res.json();
-                    setComplaints([newComplaint, ...complaints]);
-                    toast.success('Complaint submitted successfully!');
-                }
-            } catch (err) {
-                toast.error('Server error!');
+    useEffect(() => {
+        fetchComplaints();
+    }, [fetchComplaints]);
+
+    const handleSubmit = async (values) => {
+        setIsLoading(true);
+        try {
+            const payload = {
+                ...values,
+                deliveryDate: values.deliveryDate.toISOString(),
+                rescheduleDate: values.rescheduleDate.toISOString(),
+                userId: user.id,
+                userName: user.name,
+                status: editingComplaint ? editingComplaint.status : 'Pending'
+            };
+
+            const url = editingComplaint ? `/api/complaints/${editingComplaint._id}` : '/api/complaints';
+            const method = editingComplaint ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await res.json();
+
+            if (editingComplaint) {
+                setComplaints(complaints.map(c => c._id === result._id ? result : c));
+                toast.success('Report parameters updated');
+            } else {
+                setComplaints([result, ...complaints]);
+                toast.success('New report logged successfully');
             }
-        };
-        processSubmission();
-
-        setFormData({
-            orderId: '',
-            productName: '',
-            deliveryDate: '',
-            issueType: 'Not Delivered',
-            rescheduleDate: '',
-            address: '',
-            status: 'Pending'
-        });
-        setIsEditing(false);
-        setShowForm(false);
-
-        setTimeout(() => setMessage(null), 3000);
+            handleCancel();
+        } catch {
+            toast.error('System processing error');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const handleEdit = (complaint) => {
-        setFormData(complaint);
-        setIsEditing(true);
-        setShowForm(true);
+    const handleEdit = (record) => {
+        setEditingComplaint(record);
+        form.setFieldsValue({
+            ...record,
+            deliveryDate: dayjs(record.deliveryDate),
+            rescheduleDate: dayjs(record.rescheduleDate),
+        });
+        setIsModalOpen(true);
+    };
+
+    const handleCancel = () => {
+        setIsModalOpen(false);
+        setEditingComplaint(null);
+        form.resetFields();
     };
 
     const handleDelete = async (id) => {
-        if (window.confirm('Are you sure you want to delete this report?')) {
-            try {
-                await fetch(`/api/complaints/${id}`, { method: 'DELETE' });
-                setComplaints(complaints.filter(c => c._id !== id));
-                toast.success('Report deleted successfully');
-            } catch (err) {
-                toast.error('Server error!');
+        Modal.confirm({
+            title: 'Confirm Deletion',
+            content: 'This action will permanently remove the logistics report. Continue?',
+            okText: 'Delete',
+            okType: 'danger',
+            cancelText: 'Cancel',
+            centered: true,
+            onOk: async () => {
+                try {
+                    await fetch(`/api/complaints/${id}`, { method: 'DELETE' });
+                    setComplaints(complaints.filter(c => c._id !== id));
+                    toast.success('Report expunged');
+                } catch {
+                    toast.error('Deletion failed');
+                }
             }
-        }
+        });
     };
 
-    // Filter and Search Logic
     const filteredComplaints = complaints.filter(c => {
         const matchesSearch = c.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
             c.orderId.toLowerCase().includes(searchQuery.toLowerCase());
@@ -127,306 +151,320 @@ const Dashboard = () => {
         return matchesSearch && matchesStatus;
     });
 
-    return (
-        <div className="max-w-6xl mx-auto py-6 flex flex-col gap-8">
-            {/* Header Section */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-fade-in">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Welcome, {user.name}</h1>
-                    <p className="text-slate-500">Manage your reported missing products and reschedule deliveries.</p>
-                </div>
-                <button
-                    onClick={() => setShowForm(true)}
-                    className="btn-primary flex items-center gap-2 px-6 py-3"
-                >
-                    <PlusCircle className="w-5 h-5" />
-                    Report Missing Product
-                </button>
-            </div>
-
-            {/* Stats Quick View */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                <StatCard
-                    icon={<Clock className="text-amber-600" />}
-                    label="Pending"
-                    count={complaints.filter(c => c.status === 'Pending').length}
-                    color="bg-amber-50"
-                />
-                <StatCard
-                    icon={<CheckCircle className="text-emerald-600" />}
-                    label="Approved"
-                    count={complaints.filter(c => c.status === 'Approved').length}
-                    color="bg-emerald-50"
-                />
-                <StatCard
-                    icon={<X className="text-rose-600" />}
-                    label="Cancel"
-                    count={complaints.filter(c => c.status === 'Cancel').length}
-                    color="bg-rose-50"
-                />
-            </div>
-
-            {/* Search & Filter Bar */}
-            <div className="glass-panel p-4 rounded-2xl flex flex-col md:flex-row gap-4 items-center">
-                <div className="relative flex-1 w-full">
-                    <Search className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" />
-                    <input
-                        type="text"
-                        placeholder="Search by product name or order ID..."
-                        className="input-field pl-10 w-full"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                </div>
-                <div className="flex items-center gap-2 w-full md:w-auto">
-                    <Filter className="w-5 h-5 text-slate-500" />
-                    <select
-                        className="input-field w-full md:w-40"
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                    >
-                        <option value="All">All Status</option>
-                        <option value="Pending">Pending</option>
-                        <option value="Approved">Approved</option>
-                        <option value="Cancel">Cancel</option>
-                    </select>
-                </div>
-            </div>
-
-            {/* Table Section */}
-            <div className="glass-panel rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead className="bg-slate-50 border-b border-slate-100">
-                            <tr>
-                                <th className="px-6 py-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">Order Info</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">Issue Type</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">Reschedule Date</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 italic md:not-italic">
-                            {filteredComplaints.length > 0 ? (
-                                filteredComplaints.map((c) => (
-                                    <tr key={c._id} className="hover:bg-blue-50/30 transition-colors group">
-                                        <td className="px-6 py-4">
-                                            <div className="font-bold text-slate-800">{c.productName}</div>
-                                            <div className="text-xs text-slate-400 font-mono">ID: {c.orderId}</div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
-                                                {c.issueType}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-slate-600 text-sm">
-                                            {new Date(c.rescheduleDate).toLocaleDateString()}
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${c.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' :
-                                                c.status === 'Cancel' ? 'bg-rose-100 text-rose-700' :
-                                                    'bg-amber-100 text-amber-700'
-                                                }`}>
-                                                {c.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex justify-start items-center gap-2">
-                                                <button
-                                                    onClick={() => handleEdit(c)}
-                                                    className="p-2 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
-                                                >
-                                                    <Edit className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(c._id)}
-                                                    className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            ) : (
-                                <tr>
-                                    <td colSpan="5" className="px-6 py-20 text-center">
-                                        <div className="flex flex-col items-center gap-2 opacity-40">
-                                            <Package className="w-12 h-12" />
-                                            <p className="text-lg">No reports found matching your criteria.</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {/* Modal Form */}
-            <AnimatePresence>
-                {showForm && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            onClick={() => setShowForm(false)}
-                            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+    const columns = [
+        {
+            title: 'LOGISTICS ID',
+            dataIndex: 'orderId',
+            key: 'orderId',
+            render: (text) => <Text code className="text-blue-400 font-mono">{text}</Text>,
+        },
+        {
+            title: 'PRODUCT ASSET',
+            dataIndex: 'productName',
+            key: 'productName',
+            render: (text) => <Text strong className="text-white">{text}</Text>,
+        },
+        {
+            title: 'ISSUE TYPE',
+            dataIndex: 'issueType',
+            key: 'issueType',
+            render: (tag) => (
+                <Tag color="cyan" className="uppercase font-bold text-[10px] tracking-wider border-none">
+                    {tag}
+                </Tag>
+            ),
+        },
+        {
+            title: 'RE-DELIVERY',
+            dataIndex: 'rescheduleDate',
+            key: 'rescheduleDate',
+            render: (date) => <Text className="text-slate-400">{dayjs(date).format('MMM DD, YYYY')}</Text>,
+        },
+        {
+            title: 'STATUS',
+            dataIndex: 'status',
+            key: 'status',
+            render: (status) => {
+                let color = 'gold';
+                let icon = <ClockCircleOutlined />;
+                if (status === 'Approved') { color = 'success'; icon = <CheckCircleOutlined />; }
+                if (status === 'Cancel') { color = 'error'; icon = <CloseCircleOutlined />; }
+                return (
+                    <Tag icon={icon} color={color} className="font-bold border-none">
+                        {status.toUpperCase()}
+                    </Tag>
+                );
+            },
+        },
+        {
+            title: 'ACTIONS',
+            key: 'action',
+            render: (_, record) => (
+                <Space size="middle">
+                    <Tooltip title="Modify Report">
+                        <Button 
+                            type="text" 
+                            icon={<EditOutlined />} 
+                            onClick={() => handleEdit(record)}
+                            className="text-slate-500 hover:text-blue-400"
                         />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                            className="relative bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-                        >
-                            <div className="p-6 border-b flex justify-between items-center bg-slate-50">
-                                <h2 className="text-2xl font-bold text-slate-800">{isEditing ? 'Edit Missing Product Report' : 'Report Missing Product'}</h2>
-                                <button
-                                    onClick={() => {
-                                        setShowForm(false);
-                                        setIsEditing(false);
-                                        setFormData({
-                                            orderId: '', productName: '', deliveryDate: '',
-                                            issueType: 'Not Delivered', rescheduleDate: '', address: '', status: 'Pending'
-                                        });
-                                    }}
-                                    className="p-2 hover:bg-slate-200 rounded-full transition-colors"
-                                >
-                                    <X className="w-6 h-6" />
-                                </button>
-                            </div>
+                    </Tooltip>
+                    <Tooltip title="Delete Report">
+                        <Button 
+                            type="text" 
+                            danger 
+                            icon={<DeleteOutlined />} 
+                            onClick={() => handleDelete(record._id)}
+                            className="text-slate-500 hover:text-rose-500"
+                        />
+                    </Tooltip>
+                </Space>
+            ),
+        },
+    ];
 
-                            <div className="p-8 overflow-y-auto">
-                                <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <label className="block text-sm font-semibold text-slate-700 mb-2">Order ID</label>
-                                        <div className="relative">
-                                            <Package className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" />
-                                            <input
-                                                type="text"
-                                                placeholder="e.g. #ORD12345"
-                                                className="input-field pl-10"
-                                                value={formData.orderId}
-                                                onChange={(e) => setFormData({ ...formData, orderId: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-semibold text-slate-700 mb-2">Product Name</label>
-                                        <input
-                                            type="text"
-                                            placeholder="e.g. Wireless Headphones"
-                                            className="input-field"
-                                            value={formData.productName}
-                                            onChange={(e) => setFormData({ ...formData, productName: e.target.value })}
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-semibold text-slate-700 mb-2">Original Delivery Date</label>
-                                        <div className="relative">
-                                            <Calendar className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" />
-                                            <input
-                                                type="date"
-                                                className="input-field pl-10"
-                                                value={formData.deliveryDate}
-                                                onChange={(e) => setFormData({ ...formData, deliveryDate: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-semibold text-slate-700 mb-2">Issue Type</label>
-                                        <div className="relative">
-                                            <AlertCircle className="absolute left-3 top-2.5 w-5 h-5 text-slate-400 pt-0.5" />
-                                            <select
-                                                className="input-field pl-10"
-                                                value={formData.issueType}
-                                                onChange={(e) => setFormData({ ...formData, issueType: e.target.value })}
-                                            >
-                                                <option>Not Delivered</option>
-                                                <option>Delivered to Wrong Address</option>
-                                                <option>Damaged Product</option>
-                                                <option>Missing Item</option>
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-semibold text-slate-700 mb-2">Status</label>
-                                        <select
-                                            className="input-field"
-                                            value={formData.status || 'Pending'}
-                                            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                                        >
-                                            <option value="Pending">Pending</option>
-                                            <option value="Approved">Approved</option>
-                                            <option value="Cancel">Cancel</option>
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-semibold text-slate-700 mb-2">Preferred Reschedule Date</label>
-                                        <input
-                                            type="date"
-                                            className="input-field"
-                                            min={new Date().toISOString().split('T')[0]}
-                                            value={formData.rescheduleDate}
-                                            onChange={(e) => setFormData({ ...formData, rescheduleDate: e.target.value })}
-                                        />
-                                    </div>
-
-                                    <div className="md:col-span-2">
-                                        <label className="block text-sm font-semibold text-slate-700 mb-2">Delivery Address</label>
-                                        <div className="relative">
-                                            <MapPin className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
-                                            <textarea
-                                                rows="3"
-                                                placeholder="Enter full delivery address..."
-                                                className="input-field pl-10 pt-2"
-                                                value={formData.address}
-                                                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                                            ></textarea>
-                                        </div>
-                                    </div>
-
-                                    <div className="md:col-span-2 flex gap-4 pt-4 border-t">
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowForm(false)}
-                                            className="flex-1 btn-secondary"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            type="submit"
-                                            className="flex-1 btn-primary"
-                                        >
-                                            Submit Report
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
+    return (
+        <ConfigProvider
+            theme={{
+                algorithm: theme.darkAlgorithm,
+                token: {
+                    colorPrimary: '#2563eb',
+                    borderRadius: 16,
+                    colorBgContainer: '#0f172a',
+                    colorBorderSecondary: 'rgba(255,255,255,0.05)'
+                },
+                components: {
+                    Table: {
+                        headerBg: '#1e293b',
+                    },
+                    Modal: {
+                        contentBg: '#1e293b',
+                        headerBg: '#1e293b',
+                    }
+                }
+            }}
+        >
+            <div className="max-w-7xl mx-auto py-10 px-6 space-y-10">
+                {/* Dashboard Header */}
+                <Row justify="space-between" align="middle" gutter={[16, 16]}>
+                    <Col xs={24} md={16}>
+                        <motion.div initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }}>
+                            <Title level={2} className="m-0! font-black!">Terminal Hub: {user.name}</Title>
+                            <Text className="text-slate-500 font-medium">Monitoring encrypted logistics reports and rescheduling operations.</Text>
                         </motion.div>
+                    </Col>
+                    <Col xs={24} md={8} className="text-right">
+                        <Button 
+                            type="primary" 
+                            size="large" 
+                            icon={<PlusOutlined />} 
+                            onClick={() => setIsModalOpen(true)}
+                            className="bg-blue-600 hover:bg-blue-500 h-14 px-8 font-bold rounded-2xl shadow-xl shadow-blue-900/30 border-none"
+                        >
+                            Report Missing Product
+                        </Button>
+                    </Col>
+                </Row>
+
+                {/* Statistics Overview */}
+                <Row gutter={[24, 24]}>
+                    <Col xs={24} sm={8}>
+                        <StatCard 
+                            title="PENDING VERIFICATION" 
+                            value={complaints.filter(c => c.status === 'Pending').length}
+                            icon={<ClockCircleOutlined />}
+                            color="#eab308"
+                        />
+                    </Col>
+                    <Col xs={24} sm={8}>
+                        <StatCard 
+                            title="APPROVED RESOLUTIONS" 
+                            value={complaints.filter(c => c.status === 'Approved').length}
+                            icon={<CheckCircleOutlined />}
+                            color="#10b981"
+                        />
+                    </Col>
+                    <Col xs={24} sm={8}>
+                        <StatCard 
+                            title="VOIDED CLAIMS" 
+                            value={complaints.filter(c => c.status === 'Cancel').length}
+                            icon={<CloseCircleOutlined />}
+                            color="#f43f5e"
+                        />
+                    </Col>
+                </Row>
+
+                {/* Operations Control Panel */}
+                <Card className="border-white/5 shadow-2xl overflow-hidden rounded-4xl">
+                    <div className="flex flex-col md:flex-row gap-6 mb-8 items-center bg-slate-800/20 p-6 rounded-3xl border border-white/5">
+                        <div className="flex-1 w-full relative">
+                            <Input
+                                placeholder="Filter by product name, order ID or carrier info..."
+                                prefix={<SearchOutlined className="text-slate-500 mr-2" />}
+                                className="h-12 bg-slate-900 border-white/5 rounded-xl hover:border-blue-500/50"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+                        <div className="w-full md:w-64">
+                            <Select
+                                className="w-full h-12"
+                                value={statusFilter}
+                                onChange={setStatusFilter}
+                                suffixIcon={<FilterOutlined />}
+                                options={[
+                                    { value: 'All', label: 'All Operations' },
+                                    { value: 'Pending', label: 'Pending' },
+                                    { value: 'Approved', label: 'Approved' },
+                                    { value: 'Cancel', label: 'Voided' },
+                                ]}
+                            />
+                        </div>
                     </div>
-                )}
-            </AnimatePresence>
-        </div>
+
+                    <Table 
+                        columns={columns} 
+                        dataSource={filteredComplaints} 
+                        rowKey="_id"
+                        loading={isLoading}
+                        pagination={{ pageSize: 8, position: ['bottomCenter'] }}
+                        className="custom-table"
+                        locale={{ emptyText: <Empty description="No logistics reports found" /> }}
+                    />
+                </Card>
+
+                {/* Logistics Form Modal */}
+                <Modal
+                    title={<Title level={3} className="m-0! text-white">{editingComplaint ? 'Modify Logistics Report' : 'Initialize Logistics Claim'}</Title>}
+                    open={isModalOpen}
+                    onCancel={handleCancel}
+                    footer={null}
+                    width={720}
+                    className="premium-modal"
+                    centered
+                    destroyOnClose
+                >
+                    <Form
+                        form={form}
+                        layout="vertical"
+                        onFinish={handleSubmit}
+                        className="pt-6"
+                        requiredMark={false}
+                    >
+                        <Row gutter={24}>
+                            <Col span={12}>
+                                <Form.Item
+                                    name="orderId"
+                                    label="TRACKING ID"
+                                    rules={[{ required: true, message: 'Tracking reference required' }]}
+                                >
+                                    <Input prefix={<BarcodeOutlined />} placeholder="e.g. #ORD12345" />
+                                </Form.Item>
+                            </Col>
+                            <Col span={12}>
+                                <Form.Item
+                                    name="productName"
+                                    label="ASSET NAME"
+                                    rules={[{ required: true, message: 'Product name required' }]}
+                                >
+                                    <Input placeholder="e.g. Quantum Processor X1" />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+
+                        <Row gutter={24}>
+                            <Col span={12}>
+                                <Form.Item
+                                    name="deliveryDate"
+                                    label="INCIDENT DATE"
+                                    rules={[{ required: true, message: 'Original date required' }]}
+                                >
+                                    <DatePicker className="w-full" prefix={<CalendarOutlined />} />
+                                </Form.Item>
+                            </Col>
+                            <Col span={12}>
+                                <Form.Item
+                                    name="issueType"
+                                    label="ANOMALY TYPE"
+                                    initialValue="Not Delivered"
+                                >
+                                    <Select options={[
+                                        { value: 'Not Delivered', label: 'Not Delivered' },
+                                        { value: 'Delivered to Wrong Address', label: 'Wrong Destination' },
+                                        { value: 'Damaged Product', label: 'Compromised Asset' },
+                                        { value: 'Missing Item', label: 'Partial Incomplete' },
+                                    ]} />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+
+                        <Row gutter={24}>
+                            <Col span={12}>
+                                <Form.Item
+                                    name="rescheduleDate"
+                                    label="RE-DELIVERY TARGET"
+                                    rules={[{ required: true, message: 'Target date required' }]}
+                                >
+                                    <DatePicker 
+                                        className="w-full" 
+                                        disabledDate={(current) => current && current < dayjs().startOf('day')}
+                                    />
+                                </Form.Item>
+                            </Col>
+                            <Col span={12}>
+                                <Form.Item
+                                    label="SECURITY STATUS"
+                                    tooltip={{ title: 'Admin override required to change status', icon: <InfoCircleOutlined /> }}
+                                >
+                                    <Input value={editingComplaint?.status || 'Pending'} disabled />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+
+                        <Form.Item
+                            name="address"
+                            label="DESTINATION PARAMETERS"
+                            rules={[{ required: true, message: 'Full address required' }]}
+                        >
+                            <TextArea rows={4} prefix={<EnvironmentOutlined />} placeholder="Enter full delivery destination coordinates..." />
+                        </Form.Item>
+
+                        <Form.Item className="mb-0 pt-6 flex justify-end">
+                            <Space size="middle">
+                                <Button onClick={handleCancel} size="large" className="rounded-xl px-8 h-12">Cancel</Button>
+                                <Button 
+                                    type="primary" 
+                                    htmlType="submit" 
+                                    size="large" 
+                                    loading={isLoading}
+                                    className="bg-blue-600 hover:bg-blue-500 rounded-xl px-12 h-12 font-bold shadow-lg shadow-blue-900/20 border-none"
+                                >
+                                    {editingComplaint ? 'Update Parameters' : 'Authorize Claim'}
+                                </Button>
+                            </Space>
+                        </Form.Item>
+                    </Form>
+                </Modal>
+            </div>
+            
+        </ConfigProvider>
     );
 };
 
-const StatCard = ({ icon, label, count, color }) => (
-    <div className={`p-6 rounded-2xl flex items-center gap-4 border border-slate-100 shadow-sm ${color}`}>
-        <div className="p-3 bg-white rounded-xl shadow-sm">
-            {icon}
-        </div>
-        <div>
-            <p className="text-sm font-semibold text-slate-500">{label}</p>
-            <p className="text-2xl font-bold text-slate-800">{count}</p>
-        </div>
-    </div>
+const StatCard = ({ title, value, icon, color }) => (
+    <Card className="border-none shadow-xl rounded-3xl overflow-hidden group">
+        <Statistic
+            title={<Text className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">{title}</Text>}
+            value={value}
+            prefix={React.cloneElement(icon, { style: { color, marginRight: '12px', fontSize: '24px' } })}
+            valueStyle={{ color: '#fff', fontWeight: 900, fontSize: '36px', display: 'flex', alignItems: 'center' }}
+            className="p-2"
+        />
+        <div 
+            className="absolute bottom-0 left-0 h-1 transition-all duration-500 w-0 group-hover:w-full" 
+            style={{ backgroundColor: color }}
+        />
+    </Card>
 );
 
 export default Dashboard;
